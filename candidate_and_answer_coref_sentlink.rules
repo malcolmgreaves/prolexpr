@@ -1,0 +1,64 @@
+##################################################
+##                                              ##
+##     rules for generating candidate answers   ##
+##                                              ##
+##################################################
+#
+# RULE: neither query nor answer can have co-referents -- sentence and answer come from the same sentence or same document, has constraints
+#
+candidateSentence(Query,Sentence,Answer) :- sentlink(Query,Sentence,Answer),constraint(Sentence,Answer) #sentNoCoref .
+# stanfordCoreference	w_Afghanistan_in_May	id_APW_ENG_20070119.1299:8	w_its	id_APW_ENG_20070119.1299:8
+#
+# RULE: only query can have co-referents -- sentence and answer come from same document; answer and referent to query are in the same sentence
+#
+candidateQueryCoref(Query,SentenceQ,QueryRef,SentenceA,Answer) :- doclink(Query,SentenceQ,SentenceA,QueryRef),sentlink(QueryRef,SentenceA,Answer),stanfordCoreference(Query,SentenceQ,QueryRef,SentenceA) #queryCoref .
+#
+# RULE: only answer can have co-referents -- sentence and answer come from same document; query and answer referent are in same sentence
+#
+candidateAnswerCoref(Query,SentenceQ,AnswerRef,SentenceA,Answer) :- sentlink(Query,SentenceQ,AnswerRef),stanfordCoreference(AnswerRef,SentenceQ,Answer,SentenceA) #answerCoref .
+#
+# RULE: both query and answer can have co-referents -- sentence and answer come from same document; query and answer are in distinct sentences, query and answer referent are in same sentence
+#
+candidateDoubleCoref(Query,SentenceQ,QueryRef,SentenceRef,AnswerRef,SentenceA,Answer) :- doclink(Query,SentenceQ,SentenceRef,QueryRef),sentlink(QueryRef,SentenceRef,AnswerRef),doclink(AnswerRef,SentenceRef,SentenceA,Answer),stanfordCoreference(Query,SentenceQ,QueryRef,SentenceRef),stanfordCoreference(AnswerRef,SentenceRef,Answer,SentenceA) #bothCoref .
+
+##################################################
+##                                              ##
+##               supporting rules               ##
+##                                              ##
+##################################################
+#
+# Query and Answer are in the same document
+#
+doclink(Query,SentenceQ,SentenceA,Answer) :- entityInDocsent(Query,SentenceQ),docsentHasDoc(SentenceQ,Doc),docHasDocsent(Doc,SentenceA),docsentHasEntity(SentenceA,Answer) #doclink .
+#
+# Query and Answer are in the same sentence
+#
+sentlink(Query,Sentence,Answer) :- entityInDocsent(Query,Sentence),docsentHasEntity(Sentence,Answer) #sentlink .
+#
+# various constraints for the answer
+#
+constraint(Sentence,Answer) :- constraintPOS(Sentence,Answer), constraintNER(Sentence,Answer) #constraint .
+#
+# constratins answers to be a noun type
+#
+# docsentHasWordHasPOS    id_APW_ENG_20070126.0037:6      w_Administration_Committee      p_NNP
+constraintPOS(Sentence,Answer) :- docsentHasWordHasPOS(Sentence,Answer,p_NN) #p_NN .
+constraintPOS(Sentence,Answer) :- docsentHasWordHasPOS(Sentence,Answer,p_NNS) #p_NNS .
+constraintPOS(Sentence,Answer) :- docsentHasWordHasPOS(Sentence,Answer,p_NNP) #p_NNP .
+constraintPOS(Sentence,Answer) :- docsentHasWordHasPOS(Sentence,Answer,p_NNPS) #p_NNPS .
+#
+# allows learning feature weights for LOCATION NER tag
+#
+constraintNER(Sentence,Answer) :- docsentHasWordHasNER(Sentence,Answer,n_LOCATION) #nerLoc .
+constraintNER(Sentence,Answer) :- docsentHasWordHasNER(Sentence,Answer,n_PERSON) #nerPer .
+constraintNER(Sentence,Answer) :- docsentHasWordHasNER(Sentence,Answer,n_ORGANIZATION) #nerOrg .
+constraintNER(Sentence,Answer) :- #nerNothing .
+#
+# current ComplexFeature examples
+#
+# allows Sentence and Answer to be populated before using these ComplexFeature
+# features(Query,Sentence,Answer) :- #escape__WordIsNounType(Sentence,Answer),escape__WordIsLocation(Sentence,Answer) .
+#
+# prototype ComplexFeature use case
+# 
+#example(Query,Sentence,Word) :- # example , pmi(Word) > 5.2 , idf(Word) < 200 , known_location(Word) = true
